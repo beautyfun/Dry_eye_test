@@ -1,11 +1,136 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <title>My GitHub Page</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>乾眼症檢測</title>
+    <!-- 引入 Tailwind CSS 讓介面好看 (可選) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 LIFF SDK -->
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
-<body>
-    <h1>Hello GitHub Pages!</h1>
+<body class="bg-blue-50 p-4">
+
+    <div id="loading" class="text-center p-10">載入中...</div>
+
+    <div id="quiz-container" class="max-w-md mx-auto bg-white rounded-xl shadow-lg p-6 hidden">
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">乾眼症自我檢測</h1>
+
+        <!-- 問題 1 -->
+        <div class="mb-6">
+            <p class="font-semibold mb-2">1. 你是否經常感到眼睛乾澀或有異物感？</p>
+            <div id="q1" class="space-y-2">
+                <button data-value="0" class="option-btn w-full text-left p-3 rounded-lg border-2">經常</button>
+                <button data-value="1" class="option-btn w-full text-left p-3 rounded-lg border-2">偶爾</button>
+                <button data-value="2" class="option-btn w-full text-left p-3 rounded-lg border-2">很少</button>
+                <button data-value="3" class="option-btn w-full text-left p-3 rounded-lg border-2">從不</button>
+            </div>
+        </div>
+
+        <!-- 問題 2, 3, 4 ... 以此類推 -->
+        <div class="mb-6">
+            <p class="font-semibold mb-2">2. 長時間使用電腦或手機後，眼睛是否感到疲勞？</p>
+            <div id="q2" class="space-y-2">
+                <button data-value="0" class="option-btn w-full text-left p-3 rounded-lg border-2">總是</button>
+                <button data-value="1" class="option-btn w-full text-left p-3 rounded-lg border-2">經常</button>
+                <button data-value="2" class="option-btn w-full text-left p-3 rounded-lg border-2">偶爾</button>
+                <button data-value="3" class="option-btn w-full text-left p-3 rounded-lg border-2">從不</button>
+            </div>
+        </div>
+
+        <!-- ... 其他問題 ... -->
+
+        <button id="submit-btn" class="w-full bg-blue-500 text-white font-bold py-3 px-6 rounded-xl mt-6 disabled:bg-gray-400">
+            查看結果
+        </button>
+    </div>
+
+<script>
+    // --- 答案儲存 ---
+    const answers = {};
+
+    // --- 頁面初始化 ---
+    document.addEventListener('DOMContentLoaded', function () {
+        // LIFF 初始化
+        liff.init({ liffId: "YOUR_LIFF_ID" }) // 請換成您自己的 LIFF ID
+            .then(() => {
+                // 初始化成功，顯示問卷
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('quiz-container').classList.remove('hidden');
+            })
+            .catch((err) => {
+                console.error(err);
+                alert("LIFF 初始化失敗");
+            });
+
+        // --- 按鈕點擊邏輯 ---
+        const optionGroups = document.querySelectorAll('[id^="q"]');
+        optionGroups.forEach(group => {
+            const buttons = group.querySelectorAll('.option-btn');
+            buttons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    // 移除同組其他按鈕的選中樣式
+                    buttons.forEach(b => b.classList.remove('bg-blue-100', 'border-blue-500'));
+                    // 添加當前按鈕的選中樣式
+                    btn.classList.add('bg-blue-100', 'border-blue-500');
+                    // 儲存答案
+                    answers[group.id] = parseInt(btn.dataset.value, 10);
+                });
+            });
+        });
+
+        // --- 提交按鈕邏輯 ---
+        document.getElementById('submit-btn').addEventListener('click', submitAnswers);
+    });
+
+    // --- 提交答案到 Make.com ---
+    async function submitAnswers() {
+        // 檢查是否所有問題都回答了
+        if (Object.keys(answers).length < 2) { // 假設有2個問題
+            alert("請回答所有問題！");
+            return;
+        }
+
+        // 顯示處理中
+        const submitBtn = document.getElementById('submit-btn');
+        submitBtn.textContent = '分析中...';
+        submitBtn.disabled = true;
+
+        try {
+            // 取得使用者 LINE Profile
+            const profile = await liff.getProfile();
+            const userId = profile.userId;
+
+            // 準備要發送的資料
+            const data = {
+                userId: userId,
+                // 將答案物件轉為陣列 [0, 1, ...]
+                scores: Object.values(answers)
+            };
+
+            // 發送到 Make.com Webhook (POST 請求)
+            const response = await fetch('YOUR_MAKE_WEBHOOK_URL', { // 請換成您 Make.com 的 Webhook URL
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data),
+            });
+            
+            if (!response.ok) {
+                throw new Error('發送失敗');
+            }
+
+            // 成功發送後，關閉 LIFF 視窗
+            liff.closeWindow();
+
+        } catch (error) {
+            console.error('提交失敗:', error);
+            alert("提交失敗，請稍後再試");
+            submitBtn.textContent = '查看結果';
+            submitBtn.disabled = false;
+        }
+    }
+</script>
 </body>
 </html>
-
